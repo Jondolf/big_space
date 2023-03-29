@@ -1,8 +1,4 @@
-use bevy::{
-    math::Vec3A,
-    prelude::*,
-    render::primitives::{Aabb, Sphere},
-};
+use bevy::{prelude::*, render::primitives::Aabb};
 use big_space::{
     camera::{CameraController, CameraInput},
     FloatingOrigin, GridCell,
@@ -56,8 +52,8 @@ fn setup(
     });
 
     let mut translation = Vec3::ZERO;
-    for i in 1..=37_i128 {
-        let j = 10_f32.powf(i as f32 - 10.0) as f32;
+    for i in 0..=30_i128 {
+        let j = 10_f32.powf(i as f32 - 3.0);
         translation.x += j;
         commands.spawn((
             PbrBundle {
@@ -66,10 +62,7 @@ fn setup(
                 transform: Transform::from_scale(Vec3::splat(j)).with_translation(translation),
                 ..default()
             },
-            Aabb::from(Sphere {
-                center: Vec3A::ZERO,
-                radius: j / 2.0,
-            }),
+            Aabb::from_min_max(Vec3::splat(-j * 0.5), Vec3::splat(j * 0.5)),
             GridCell::<i128>::default(),
         ));
     }
@@ -133,7 +126,7 @@ fn ui_text_system(
     let camera_text = if speed > 3.0e8 {
         format!("Camera Speed: {:.0e} * speed of light", speed / 3.0e8)
     } else {
-        format!("Camera Speed: {:.2e} m/s", speed)
+        format!("Camera Speed: {:.3} m/s", speed)
     };
 
     let nearest_text = if let Some(nearest) = camera.single().nearest_object() {
@@ -149,7 +142,7 @@ fn ui_text_system(
             _ => "",
         };
         let dist = nearest.1;
-        format!("Nearest sphere diameter: {dia:.0e} m    {dia_fact}\nNearest sphere distance: {dist:.0e} m",)
+        format!("Nearest sphere diameter: {dia:.0e} m    {dia_fact}\nNearest sphere distance: {dist:.1e} m",)
     } else {
         "".into()
     };

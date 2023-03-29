@@ -91,10 +91,10 @@ use bevy::{math::DVec3, prelude::*, transform::TransformSystem};
 use std::marker::PhantomData;
 
 pub mod camera;
-pub mod precision;
-
 #[cfg(feature = "debug")]
 pub mod debug;
+pub mod physics;
+pub mod precision;
 
 use precision::*;
 

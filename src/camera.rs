@@ -33,6 +33,7 @@ impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
                         }),
                 )
                 .with_system(nearest_objects.before(camera_controller::<P>))
+                .with_system(dynamic_near_plane.after(nearest_objects))
                 .with_system(camera_controller::<P>.before(TransformSystem::TransformPropagate)),
         );
     }
@@ -167,8 +168,8 @@ pub fn default_camera_inputs(
     }
 }
 
-/// Find the object nearest the camera
-pub fn nearest_objects(
+/// Find the object nearest the camera.
+fn nearest_objects(
     objects: Query<(Entity, &GlobalTransform, &Aabb)>,
     mut camera: Query<(&GlobalTransform, &mut CameraController)>,
 ) {
@@ -187,6 +188,21 @@ pub fn nearest_objects(
     }
 }
 
+/// Pulls in the near plane for small close objects.
+pub fn dynamic_near_plane(mut cameras: Query<(&mut Projection, &CameraController)>) {
+    for (mut projection, cam_controller) in cameras.iter_mut() {
+        if let Projection::Perspective(PerspectiveProjection { near, .. }) = projection.as_mut() {
+            *near = (cam_controller
+                .nearest_object
+                .map(|object| object.1)
+                .unwrap_or(0.1)
+                .abs()
+                / 3.0)
+                .min(0.1) as f32;
+        }
+    }
+}
+
 /// Uses [`CameraInput`] state to update the camera position.
 pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
@@ -195,13 +211,16 @@ pub fn camera_controller<P: GridPrecision>(
     mut camera: Query<(&mut Transform, &mut CameraController, &mut GridCell<P>)>,
 ) {
     for (mut cam_transform, mut controller, mut cell) in camera.iter_mut() {
+        let boost_multiplier = 5.0;
+        let speed_multiplier = (boost_multiplier * input.boost as usize as f64).max(1.0);
         let speed = match (controller.nearest_object, controller.slow_near_objects) {
             (Some(nearest), true) => nearest.1,
-            _ => controller.max_speed,
-        } * (1.0 + input.boost as usize as f64);
+            _ => controller.max_speed / boost_multiplier,
+        };
+        let speed = (speed * speed_multiplier).clamp(0.1, controller.max_speed);
 
-        let lerp_translation = 1.0 - controller.smoothness.clamp(0.0, 0.999);
-        let lerp_rotation = 1.0 - controller.rotational_smoothness.clamp(0.0, 0.999);
+        let lerp_translation = 1.0 - controller.smoothness.clamp(0.0, 0.99);
+        let lerp_rotation = 1.0 - controller.rotational_smoothness.clamp(0.0, 0.99);
 
         let (vel_t_current, vel_r_current) = (controller.vel_translation, controller.vel_rotation);
         let (vel_t_target, vel_r_target) = input.target_velocity(speed, time.delta_seconds_f64());
